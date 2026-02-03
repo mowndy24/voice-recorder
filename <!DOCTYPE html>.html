@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Input</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      padding: 20px;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      border-radius: 24px;
+      padding: 44px 36px;
+      text-align: center;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    h1 { font-size: 26px; margin-bottom: 4px; }
+
+    .subtitle {
+      color: rgba(255, 255, 255, 0.55);
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+
+    .row-badge {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 5px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+
+    /* ---- Diagnostic Panel ---- */
+    .diagnostics {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 20px;
+      text-align: left;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .diagnostics .title {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    .diag-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
+    }
+    .diag-label { color: rgba(255, 255, 255, 0.5); }
+    .diag-value { font-weight: 600; }
+    .diag-ok { color: #2ecc71; }
+    .diag-warn { color: #f39c12; }
+    .diag-fail { color: #e74c3c; }
+
+    /* ---- Debug Log ---- */
+    .debug-log {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 12px;
+      margin-top: 16px;
+      text-align: left;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      max-height: 180px;
+      overflow-y: auto;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .debug-log .title {
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: rgba(255, 255, 255, 0.5);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .log-entry { padding: 1px 0; }
+    .log-entry.error { color: #e74c3c; }
+    .log-entry.warn { color: #f39c12; }
+    .log-entry.success { color: #2ecc71; }
+    .log-entry.info { color: #3498db; }
+
+    /* ---- Record Button ---- */
+    .record-btn {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      background: #e74c3c;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .record-btn:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 30px rgba(231, 76, 60, 0.4);
+    }
+    .record-btn.recording {
+      animation: pulse 1.5s ease-in-out infinite;
+      background: #c0392b;
+      border-color: rgba(231, 76, 60, 0.5);
+    }
+    .record-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5); }
+      50% { box-shadow: 0 0 0 24px rgba(231, 76, 60, 0); }
+    }
+
+    /* ---- Transcript Box ---- */
+    .label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      text-align: left;
+      margin-bottom: 6px;
+      margin-top: 24px;
+    }
+
+    .transcript-box {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 16px;
+      min-height: 100px;
+      max-height: 220px;
+      overflow-y: auto;
+      text-align: left;
+      font-size: 15px;
+      line-height: 1.65;
+      color: rgba(255, 255, 255, 0.9);
+      white-space: pre-wrap;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+    .transcript-box:focus {
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+    .transcript-box .interim {
+      color: rgba(255, 255, 255, 0.35);
+      font-style: italic;
+    }
+    .transcript-box:empty::before {
+      content: "Your spoken words will appear here...";
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+    }
+    .char-count {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.25);
+    }
+    .edit-hint {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* ---- Buttons ---- */
+    .submit-btn {
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 28px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      margin-top: 18px;
+    }
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+    }
+    .submit-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      background: #636e72;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .clear-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.5);
+      padding: 10px 24px;
+      border-radius: 28px;
+      font-size: 14px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: all 0.2s;
+    }
+    .clear-btn:hover {
+      border-color: rgba(255, 255, 255, 0.35);
+      color: #fff;
+    }
+
+    /* ---- Status Messages ---- */
+    .status {
+      margin-top: 20px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .status.success {
+      background: rgba(46, 204, 113, 0.15);
+      color: #2ecc71;
+      border: 1px solid rgba(46, 204, 113, 0.3);
+    }
+    .status.error {
+      background: rgba(231, 76, 60, 0.15);
+      color: #e74c3c;
+      border: 1px solid rgba(231, 76, 60, 0.3);
+    }
+    .status.processing {
+      background: rgba(52, 152, 219, 0.15);
+      color: #3498db;
+      border: 1px solid rgba(52, 152, 219, 0.3);
+    }
+    .hidden { display: none; }
+
+    /* ---- Unsupported Browser Overlay ---- */
+    .browser-warning {
+      background: rgba(231, 76, 60, 0.1);
+      border: 1px solid rgba(231, 76, 60, 0.3);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    .browser-warning h3 { color: #e74c3c; margin-bottom: 8px; font-size: 16px; }
+    .browser-warning p { color: rgba(255,255,255,0.6); font-size: 13px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Voice Input</h1>
+    <p class="subtitle">Speak and your words appear as text in real-time</p>
+    <div class="row-badge" id="rowBadge"></div>
+
+    <!-- ====== DIAGNOSTIC PANEL ====== -->
+    <div class="diagnostics" id="diagnosticsPanel">
+      <div class="title">&#128269; Diagnostics</div>
+      <div class="diag-row">
+        <span class="diag-label">Protocol</span>
+        <span class="diag-value" id="diagProtocol">checking...</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Speech API</span>
+        <span class="diag-value" id="diagSpeechAPI">checking...</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Microphone Permission</span>
+        <span class="diag-value" id="diagMic">checking...</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Row Parameter</span>
+        <span class="diag-value" id="diagRow">checking...</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Recognition State</span>
+        <span class="diag-value" id="diagState">idle</span>
+      </div>
+    </div>
+
+    <div id="browserWarning" class="browser-warning hidden">
+      <h3>Browser Not Supported</h3>
+      <p>Web Speech API is not available in this browser. Please open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> on desktop, or <strong>Chrome</strong> / <strong>Safari</strong> on mobile.</p>
+    </div>
+
+    <br>
+    <button class="record-btn" id="recordBtn" onclick="toggleListening()">START</button>
+    <br>
+
+    <div class="label">Live Transcript <span style="opacity:0.5">(editable)</span>:</div>
+    <div class="transcript-box" id="transcript" contenteditable="true"></div>
+    <div class="meta-row">
+      <span class="edit-hint">Click the text box to manually edit</span>
+      <span class="char-count" id="charCount">0 characters</span>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" disabled onclick="submitText()">Submit to AI Agent</button>
+    <button class="clear-btn" onclick="clearText()">Clear &amp; Start Over</button>
+    <div id="status" class="status hidden"></div>
+
+    <!-- ====== DEBUG LOG ====== -->
+    <div class="debug-log" id="debugLog">
+      <div class="title">&#128736; Debug Log</div>
+    </div>
+  </div>
+
+<script>
+// ============================================
+// Debug Logger
+// ============================================
+function debugLog(message, level) {
+  level = level || "info";
+  var log = document.getElementById("debugLog");
+  var entry = document.createElement("div");
+  entry.className = "log-entry " + level;
+  var time = new Date().toLocaleTimeString();
+  entry.textContent = "[" + time + "] " + message;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+  console.log("[" + level.toUpperCase() + "] " + message);
+}
+
+function setDiag(id, text, status) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = "diag-value diag-" + status;
+}
+
+function updateRecognitionState(state) {
+  var el = document.getElementById("diagState");
+  if (state === "listening") {
+    setDiag("diagState", "listening", "ok");
+  } else if (state === "starting") {
+    setDiag("diagState", "starting...", "warn");
+  } else if (state === "stopped") {
+    setDiag("diagState", "stopped", "warn");
+  } else if (state === "error") {
+    setDiag("diagState", "error", "fail");
+  } else {
+    setDiag("diagState", state, "warn");
+  }
+}
+
+// ============================================
+// DIAGNOSTIC CHECK 1: Protocol
+// ============================================
+var protocol = window.location.protocol;
+var isSecure = protocol === "https:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
+if (protocol === "file:") {
+  setDiag("diagProtocol", "file:// — MAY FAIL", "warn");
+  debugLog("Page loaded via file:// protocol. Speech API may not work. Use a local server or HTTPS.", "warn");
+} else if (isSecure) {
+  setDiag("diagProtocol", protocol + " OK", "ok");
+  debugLog("Protocol: " + protocol + " (secure context)");
+} else {
+  setDiag("diagProtocol", protocol + " NOT SECURE", "fail");
+  debugLog("Page loaded over insecure " + protocol + ". Speech API requires HTTPS or localhost!", "error");
+}
+
+// ============================================
+// Configuration — Extracted from URL params
+// ============================================
+var urlParams = new URLSearchParams(window.location.search);
+var row = urlParams.get("row");
+var sheet = urlParams.get("sheet") || "Sheet1";
+
+// Dynamically determine the process-voice webhook URL
+var currentUrl = new URL(window.location.href);
+var basePath = currentUrl.pathname.indexOf("/webhook-test/") !== -1
+  ? "/webhook-test/"
+  : "/webhook/";
+var PROCESS_URL = currentUrl.origin + basePath + "process-voice";
+
+// Display row badge
+var rowBadge = document.getElementById("rowBadge");
+if (row) {
+  rowBadge.textContent = "Sheet Row: " + row;
+  setDiag("diagRow", "row=" + row, "ok");
+  debugLog("Row parameter: " + row + ", Sheet: " + sheet);
+} else {
+  rowBadge.textContent = "No row param (test mode)";
+  row = "test";
+  setDiag("diagRow", "missing — using test mode", "warn");
+  debugLog("No row parameter found. Running in test mode so button is not disabled.", "warn");
+}
+
+debugLog("Webhook URL: " + PROCESS_URL);
+
+// ============================================
+// DIAGNOSTIC CHECK 2: Web Speech API
+// ============================================
+var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+var recognition = null;
+var isListening = false;
+var finalTranscript = "";
+
+if (!SpeechRecognition) {
+  setDiag("diagSpeechAPI", "NOT AVAILABLE", "fail");
+  debugLog("SpeechRecognition API not found. This browser does not support it.", "error");
+  document.getElementById("browserWarning").classList.remove("hidden");
+  document.getElementById("recordBtn").disabled = true;
+  showStatus("Web Speech API not available. Use Chrome or Edge.", "error");
+} else {
+  setDiag("diagSpeechAPI", "Available", "ok");
+  debugLog("SpeechRecognition API found: " + (window.SpeechRecognition ? "native" : "webkit prefixed"));
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+  recognition.maxAlternatives = 1;
+
+  debugLog("Recognition configured: continuous=true, interimResults=true, lang=en-US");
+
+  // ---- Speech Recognition Events ----
+
+  recognition.onstart = function() {
+    debugLog("recognition.onstart fired — speech service connected", "success");
+    updateRecognitionState("listening");
+  };
+
+  recognition.onaudiostart = function() {
+    debugLog("recognition.onaudiostart — microphone is capturing audio", "success");
+  };
+
+  recognition.onsoundstart = function() {
+    debugLog("recognition.onsoundstart — sound detected in audio stream", "info");
+  };
+
+  recognition.onspeechstart = function() {
+    debugLog("recognition.onspeechstart — speech detected!", "success");
+  };
+
+  recognition.onspeechend = function() {
+    debugLog("recognition.onspeechend — speech ended", "info");
+  };
+
+  recognition.onsoundend = function() {
+    debugLog("recognition.onsoundend — sound ended", "info");
+  };
+
+  recognition.onaudioend = function() {
+    debugLog("recognition.onaudioend — audio capture ended", "info");
+  };
+
+  recognition.onresult = function(event) {
+    var interim = "";
+    var newFinal = "";
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      var transcript = event.results[i][0].transcript;
+      var confidence = event.results[i][0].confidence;
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript + " ";
+        newFinal += transcript;
+        debugLog("Final result: \"" + transcript.trim() + "\" (confidence: " + (confidence * 100).toFixed(1) + "%)", "success");
+      } else {
+        interim += transcript;
+      }
+    }
+
+    if (interim) {
+      debugLog("Interim: \"" + interim.trim() + "\"", "info");
+    }
+
+    var el = document.getElementById("transcript");
+    el.innerHTML = escapeHtml(finalTranscript)
+      + (interim ? '<span class="interim">' + escapeHtml(interim) + '</span>' : "");
+
+    el.scrollTop = el.scrollHeight;
+    updateCharCount();
+    updateSubmitButton();
+  };
+
+  recognition.onerror = function(event) {
+    debugLog("recognition.onerror — error: " + event.error + " (message: " + (event.message || "none") + ")", "error");
+    updateRecognitionState("error");
+
+    if (event.error === "not-allowed") {
+      setDiag("diagMic", "BLOCKED", "fail");
+      showStatus("Microphone access denied. Click the lock icon in your address bar, allow Microphone, then reload this page.", "error");
+      debugLog("FIX: Click the lock/info icon in the address bar > Site Settings > Microphone > Allow, then reload.", "error");
+      stopListening();
+    } else if (event.error === "network") {
+      showStatus("Network error — Speech recognition requires an internet connection.", "error");
+      debugLog("FIX: Check your internet connection. Chrome sends audio to Google servers for processing.", "error");
+      stopListening();
+    } else if (event.error === "no-speech") {
+      debugLog("No speech detected — this is normal during silence. Recognition continues.", "warn");
+    } else if (event.error === "audio-capture") {
+      setDiag("diagMic", "NO DEVICE", "fail");
+      showStatus("No microphone found. Please connect a microphone and reload.", "error");
+      debugLog("FIX: Ensure a microphone is connected and not in use by another app.", "error");
+      stopListening();
+    } else if (event.error === "service-not-allowed") {
+      showStatus("Speech service not allowed. This may be a browser policy restriction.", "error");
+      debugLog("FIX: This can happen on file:// URLs or in incognito mode. Try HTTPS.", "error");
+      stopListening();
+    } else if (event.error === "aborted") {
+      debugLog("Recognition was aborted.", "warn");
+    } else {
+      showStatus("Speech recognition error: " + event.error + ". Try again.", "error");
+    }
+  };
+
+  recognition.onend = function() {
+    debugLog("recognition.onend fired — service disconnected", "warn");
+    if (isListening) {
+      debugLog("Auto-restarting recognition (user still in listening mode)...", "info");
+      updateRecognitionState("starting");
+      try {
+        recognition.start();
+      } catch(e) {
+        debugLog("Auto-restart failed: " + e.message, "error");
+        updateRecognitionState("error");
+      }
+    } else {
+      updateRecognitionState("stopped");
+    }
+  };
+}
+
+// ============================================
+// DIAGNOSTIC CHECK 3: Microphone Permission
+// ============================================
+if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+  // First check permission state if the API is available
+  if (navigator.permissions && navigator.permissions.query) {
+    navigator.permissions.query({ name: "microphone" }).then(function(result) {
+      debugLog("Microphone permission state: " + result.state);
+      if (result.state === "granted") {
+        setDiag("diagMic", "Granted", "ok");
+      } else if (result.state === "prompt") {
+        setDiag("diagMic", "Will prompt on use", "warn");
+        debugLog("Microphone will be requested when you click START.", "info");
+      } else if (result.state === "denied") {
+        setDiag("diagMic", "DENIED", "fail");
+        debugLog("Microphone permission is DENIED. You must allow it in browser settings.", "error");
+      }
+
+      result.onchange = function() {
+        debugLog("Microphone permission changed to: " + result.state, "warn");
+        if (result.state === "granted") {
+          setDiag("diagMic", "Granted", "ok");
+        } else if (result.state === "denied") {
+          setDiag("diagMic", "DENIED", "fail");
+        }
+      };
+    }).catch(function(err) {
+      debugLog("Permission query not supported: " + err.message, "warn");
+      setDiag("diagMic", "Unknown (will prompt)", "warn");
+    });
+  } else {
+    setDiag("diagMic", "Unknown (will prompt)", "warn");
+    debugLog("Permissions API not available — mic access will be requested on use.", "info");
+  }
+} else {
+  setDiag("diagMic", "NO getUserMedia", "fail");
+  debugLog("navigator.mediaDevices.getUserMedia not available — mic access impossible.", "error");
+}
+
+// ============================================
+// UI Functions
+// ============================================
+
+function toggleListening() {
+  debugLog("--- toggleListening() called, isListening=" + isListening + " ---");
+  if (!isListening) {
+    startListening();
+  } else {
+    stopListening();
+  }
+}
+
+function startListening() {
+  debugLog("startListening() — beginning sequence...");
+
+  if (!recognition) {
+    debugLog("Cannot start: recognition object is null (Speech API unavailable)", "error");
+    showStatus("Speech recognition is not available in this browser.", "error");
+    return;
+  }
+
+  // Capture any manual edits
+  finalTranscript = document.getElementById("transcript").innerText.trim();
+  if (finalTranscript && !finalTranscript.endsWith(" ")) {
+    finalTranscript += " ";
+  }
+  debugLog("Existing transcript length: " + finalTranscript.length + " chars");
+
+  // First, test microphone access directly
+  debugLog("Requesting microphone access via getUserMedia...");
+  updateRecognitionState("starting");
+
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        debugLog("Microphone access GRANTED via getUserMedia", "success");
+        setDiag("diagMic", "Granted", "ok");
+
+        // Stop the test stream immediately
+        stream.getTracks().forEach(function(track) { track.stop(); });
+
+        // Now start speech recognition
+        actuallyStartRecognition();
+      })
+      .catch(function(err) {
+        debugLog("Microphone access FAILED: " + err.name + " — " + err.message, "error");
+        setDiag("diagMic", "BLOCKED: " + err.name, "fail");
+        updateRecognitionState("error");
+
+        if (err.name === "NotAllowedError") {
+          showStatus("Microphone permission denied. Click the lock icon in the address bar to allow microphone access, then reload.", "error");
+        } else if (err.name === "NotFoundError") {
+          showStatus("No microphone found. Please connect a microphone and reload.", "error");
+        } else if (err.name === "NotReadableError") {
+          showStatus("Microphone is in use by another application. Close it and try again.", "error");
+        } else {
+          showStatus("Microphone error: " + err.name + " — " + err.message, "error");
+        }
+      });
+  } else {
+    debugLog("getUserMedia not available, attempting recognition.start() directly...", "warn");
+    actuallyStartRecognition();
+  }
+}
+
+function actuallyStartRecognition() {
+  try {
+    debugLog("Calling recognition.start()...");
+    recognition.start();
+    debugLog("recognition.start() called successfully (waiting for onstart event...)", "success");
+  } catch(e) {
+    debugLog("recognition.start() threw: " + e.name + " — " + e.message, "error");
+    updateRecognitionState("error");
+
+    if (e.name === "InvalidStateError") {
+      debugLog("Recognition was already started. Stopping and retrying...", "warn");
+      try {
+        recognition.stop();
+      } catch(e2) {}
+      setTimeout(function() {
+        try {
+          recognition.start();
+          debugLog("Retry recognition.start() succeeded", "success");
+        } catch(e3) {
+          debugLog("Retry also failed: " + e3.message, "error");
+          showStatus("Could not start speech recognition. Try reloading the page.", "error");
+          return;
+        }
+      }, 300);
+    } else {
+      showStatus("Failed to start recognition: " + e.message, "error");
+      return;
+    }
+  }
+
+  isListening = true;
+  var btn = document.getElementById("recordBtn");
+  btn.textContent = "STOP";
+  btn.classList.add("recording");
+  showStatus("Listening... Speak now. Words will appear in real-time.", "processing");
+}
+
+function stopListening() {
+  debugLog("stopListening() called");
+
+  if (recognition) {
+    try {
+      recognition.stop();
+      debugLog("recognition.stop() called");
+    } catch(e) {
+      debugLog("recognition.stop() error: " + e.message, "warn");
+    }
+  }
+  isListening = false;
+  updateRecognitionState("stopped");
+
+  var btn = document.getElementById("recordBtn");
+  btn.textContent = "START";
+  btn.classList.remove("recording");
+
+  finalTranscript = document.getElementById("transcript").innerText.trim();
+  if (finalTranscript) {
+    finalTranscript += " ";
+  }
+
+  updateCharCount();
+  updateSubmitButton();
+
+  if (document.getElementById("transcript").innerText.trim().length > 0) {
+    showStatus("Stopped listening. You can edit the text above, then click Submit.", "success");
+  } else {
+    hideStatus();
+  }
+}
+
+function clearText() {
+  debugLog("clearText() called");
+  finalTranscript = "";
+  document.getElementById("transcript").innerHTML = "";
+  updateCharCount();
+  updateSubmitButton();
+  hideStatus();
+
+  if (isListening) {
+    stopListening();
+  }
+}
+
+function submitText() {
+  var text = document.getElementById("transcript").innerText.trim();
+  debugLog("submitText() — text length: " + text.length);
+
+  if (!text) {
+    showStatus("Nothing to submit. Record or type something first.", "error");
+    return;
+  }
+  if (row === "test") {
+    debugLog("Running in test mode — simulating submission", "warn");
+    showStatus("TEST MODE: Would have sent \"" + text.substring(0, 80) + (text.length > 80 ? "..." : "") + "\" to " + PROCESS_URL, "success");
+    return;
+  }
+
+  if (isListening) {
+    stopListening();
+  }
+
+  document.getElementById("submitBtn").disabled = true;
+  document.getElementById("recordBtn").disabled = true;
+  showStatus("Sending to AI Agent... This may take 10-20 seconds.", "processing");
+
+  debugLog("POSTing to " + PROCESS_URL + " with row=" + row + ", sheet=" + sheet);
+
+  fetch(PROCESS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: text,
+      row: row,
+      sheet: sheet
+    })
+  })
+  .then(function(response) {
+    debugLog("Fetch response status: " + response.status, response.ok ? "success" : "error");
+    if (!response.ok) {
+      throw new Error("Server responded with status " + response.status);
+    }
+    return response.json();
+  })
+  .then(function(result) {
+    debugLog("Success response: " + JSON.stringify(result), "success");
+    showStatus("Done! AI comment has been added to Row " + row + " in your Google Sheet. You can close this tab.", "success");
+    document.getElementById("recordBtn").disabled = false;
+  })
+  .catch(function(error) {
+    debugLog("Fetch error: " + error.message, "error");
+    showStatus("Error: " + error.message + ". Please try again.", "error");
+    document.getElementById("submitBtn").disabled = false;
+    document.getElementById("recordBtn").disabled = false;
+  });
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+function updateCharCount() {
+  var text = document.getElementById("transcript").innerText.trim();
+  document.getElementById("charCount").textContent = text.length + " characters";
+}
+
+function updateSubmitButton() {
+  var text = document.getElementById("transcript").innerText.trim();
+  document.getElementById("submitBtn").disabled = text.length === 0;
+}
+
+function showStatus(message, type) {
+  var s = document.getElementById("status");
+  s.textContent = message;
+  s.className = "status " + type;
+}
+
+function hideStatus() {
+  document.getElementById("status").className = "status hidden";
+}
+
+function escapeHtml(text) {
+  var div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ---- Listen for manual edits ----
+document.getElementById("transcript").addEventListener("input", function() {
+  updateCharCount();
+  updateSubmitButton();
+});
+
+debugLog("=== Voice Recorder Debug Version Loaded ===", "success");
+debugLog("Browser: " + navigator.userAgent);
+</script>
+</body>
+</html>
